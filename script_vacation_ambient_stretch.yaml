@@ -1,0 +1,52 @@
+# Paste this into the script editor YAML view (Settings → Automations & Scenes
+# → Scripts → + Create Script → ⋮ → Edit in YAML). Start from "alias:" — do
+# not include the top-level "vacation_ambient_stretch:" key; the editor adds that.
+
+alias: "Vacation Mode – Ambient Night Stretch"
+description: >
+  Picks one random ambient light, turns it on for 60–120 minutes (randomized),
+  then turns all ambient lights off. Single run — not a loop.
+  All variables are injected by the blueprint at runtime; the values
+  below are fallback defaults for direct script use only.
+mode: single
+variables:
+  vacation_mode_entity: "input_boolean.vacation_mode"
+  al1: "light.AMBIENT_1_REPLACE_ME"
+  al2: "light.AMBIENT_2_REPLACE_ME"
+  al3: "light.AMBIENT_3_REPLACE_ME"
+  ambient_bri: 18
+  ambient_ct: 2200
+  duration_min: 60
+  duration_max: 120
+sequence:
+  - variables:
+      pick:     "{{ range(1, 4) | random }}"
+      duration: "{{ range(duration_min | int, duration_max | int + 1) | random }}"
+  - choose:
+      - conditions: "{{ pick == 1 }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: "{{ al1 }}" }
+            data: { brightness_pct: "{{ ambient_bri }}", color_temp_kelvin: "{{ ambient_ct }}" }
+      - conditions: "{{ pick == 2 }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: "{{ al2 }}" }
+            data: { brightness_pct: "{{ ambient_bri }}", color_temp_kelvin: "{{ ambient_ct }}" }
+      - conditions: "{{ pick == 3 }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: "{{ al3 }}" }
+            data: { brightness_pct: "{{ ambient_bri }}", color_temp_kelvin: "{{ ambient_ct }}" }
+  # Wait for duration, but exit early if vacation mode is turned off
+  - wait_template: "{{ is_state(vacation_mode_entity, 'off') }}"
+    timeout:
+      minutes: "{{ duration }}"
+    continue_on_timeout: true
+  # Turn off all three regardless of which was selected
+  - service: light.turn_off
+    target:
+      entity_id:
+        - "{{ al1 }}"
+        - "{{ al2 }}"
+        - "{{ al3 }}"

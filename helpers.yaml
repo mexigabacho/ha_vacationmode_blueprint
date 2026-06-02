@@ -1,0 +1,26 @@
+# ─────────────────────────────────────────────────────────────────
+# Vacation Presence Simulation – Helpers
+# ─────────────────────────────────────────────────────────────────
+#
+# TWO WAYS TO CREATE THE INPUT BOOLEAN:
+#
+# Option A – HA UI (recommended, no YAML needed):
+#   Settings → Devices & Services → Helpers → + Create Helper
+#   → Toggle → Name: "Vacation Mode" → Entity ID will be
+#   input_boolean.vacation_mode
+#
+# Option B – Add to configuration.yaml:
+#   input_boolean:
+#     vacation_mode:
+#       name: Vacation Mode
+#       icon: mdi:home-lock
+#
+# ─────────────────────────────────────────────────────────────────
+# Once created, add a toggle card to your Lovelace dashboard to
+# flip it on/off without opening the automation editor:
+#
+#   type: tile
+#   entity: input_boolean.vacation_mode
+#   name: Vacation Mode
+#
+# ─────────────────────────────────────────────────────────────────

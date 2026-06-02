@@ -1,0 +1,138 @@
+# Paste this into the script editor YAML view (Settings → Automations & Scenes
+# → Scripts → + Create Script → ⋮ → Edit in YAML). Start from "alias:" — do
+# not include the top-level "vacation_evening_loop:" key; the editor adds that.
+
+alias: "Vacation Mode – Evening Loop"
+description: >
+  Randomly cycles main room lights through 10 single/two-room scenes.
+  All variables are injected by the blueprint at runtime; the values
+  below are fallback defaults for direct script use only.
+mode: single
+variables:
+  vacation_mode_entity: "input_boolean.vacation_mode"
+  ml1: "light.ROOM_1_REPLACE_ME"
+  ml2: "light.ROOM_2_REPLACE_ME"
+  ml3: "light.ROOM_3_REPLACE_ME"
+  ml4: "light.ROOM_4_REPLACE_ME"
+  bri_min: 35
+  bri_max: 80
+  ct_min: 2700
+  ct_max: 4000
+  hold_min: 20
+  hold_max: 55
+sequence:
+  - repeat:
+      while:
+        - condition: template
+          # Stops if vacation mode is turned off, or as a failsafe after 3am
+          value_template: >
+            {{ is_state(vacation_mode_entity, 'on') and
+               (now().hour < 3 or now().hour >= 19) }}
+      sequence:
+        - variables:
+            scene: "{{ range(1, 11) | random }}"
+            bri:   "{{ range(bri_min | int, bri_max | int + 1) | random }}"
+            ct:    "{{ range(ct_min | int, ct_max | int + 1) | random }}"
+            hold:  "{{ range(hold_min | int, hold_max | int + 1) | random }}"
+
+        - choose:
+            # ── Single-room scenes ────────────────────────────
+            - conditions: "{{ scene == 1 }}"
+              sequence:
+                - service: light.turn_on
+                  target: { entity_id: "{{ ml1 }}" }
+                  data: { brightness_pct: "{{ bri }}", color_temp_kelvin: "{{ ct }}" }
+                - service: light.turn_off
+                  target:
+                    entity_id: ["{{ ml2 }}", "{{ ml3 }}", "{{ ml4 }}"]
+
+            - conditions: "{{ scene == 2 }}"
+              sequence:
+                - service: light.turn_on
+                  target: { entity_id: "{{ ml2 }}" }
+                  data: { brightness_pct: "{{ bri }}", color_temp_kelvin: "{{ ct }}" }
+                - service: light.turn_off
+                  target:
+                    entity_id: ["{{ ml1 }}", "{{ ml3 }}", "{{ ml4 }}"]
+
+            - conditions: "{{ scene == 3 }}"
+              sequence:
+                - service: light.turn_on
+                  target: { entity_id: "{{ ml3 }}" }
+                  data: { brightness_pct: "{{ bri }}", color_temp_kelvin: "{{ ct }}" }
+                - service: light.turn_off
+                  target:
+                    entity_id: ["{{ ml1 }}", "{{ ml2 }}", "{{ ml4 }}"]
+
+            - conditions: "{{ scene == 4 }}"
+              sequence:
+                - service: light.turn_on
+                  target: { entity_id: "{{ ml4 }}" }
+                  data: { brightness_pct: "{{ bri }}", color_temp_kelvin: "{{ ct }}" }
+                - service: light.turn_off
+                  target:
+                    entity_id: ["{{ ml1 }}", "{{ ml2 }}", "{{ ml3 }}"]
+
+            # ── Two-room scenes ───────────────────────────────
+            - conditions: "{{ scene == 5 }}"
+              sequence:
+                - service: light.turn_on
+                  target:
+                    entity_id: ["{{ ml1 }}", "{{ ml2 }}"]
+                  data: { brightness_pct: "{{ bri }}", color_temp_kelvin: "{{ ct }}" }
+                - service: light.turn_off
+                  target:
+                    entity_id: ["{{ ml3 }}", "{{ ml4 }}"]
+
+            - conditions: "{{ scene == 6 }}"
+              sequence:
+                - service: light.turn_on
+                  target:
+                    entity_id: ["{{ ml1 }}", "{{ ml3 }}"]
+                  data: { brightness_pct: "{{ bri }}", color_temp_kelvin: "{{ ct }}" }
+                - service: light.turn_off
+                  target:
+                    entity_id: ["{{ ml2 }}", "{{ ml4 }}"]
+
+            - conditions: "{{ scene == 7 }}"
+              sequence:
+                - service: light.turn_on
+                  target:
+                    entity_id: ["{{ ml1 }}", "{{ ml4 }}"]
+                  data: { brightness_pct: "{{ bri }}", color_temp_kelvin: "{{ ct }}" }
+                - service: light.turn_off
+                  target:
+                    entity_id: ["{{ ml2 }}", "{{ ml3 }}"]
+
+            - conditions: "{{ scene == 8 }}"
+              sequence:
+                - service: light.turn_on
+                  target:
+                    entity_id: ["{{ ml2 }}", "{{ ml3 }}"]
+                  data: { brightness_pct: "{{ bri }}", color_temp_kelvin: "{{ ct }}" }
+                - service: light.turn_off
+                  target:
+                    entity_id: ["{{ ml1 }}", "{{ ml4 }}"]
+
+            - conditions: "{{ scene == 9 }}"
+              sequence:
+                - service: light.turn_on
+                  target:
+                    entity_id: ["{{ ml2 }}", "{{ ml4 }}"]
+                  data: { brightness_pct: "{{ bri }}", color_temp_kelvin: "{{ ct }}" }
+                - service: light.turn_off
+                  target:
+                    entity_id: ["{{ ml1 }}", "{{ ml3 }}"]
+
+            - conditions: "{{ scene == 10 }}"
+              sequence:
+                - service: light.turn_on
+                  target:
+                    entity_id: ["{{ ml3 }}", "{{ ml4 }}"]
+                  data: { brightness_pct: "{{ bri }}", color_temp_kelvin: "{{ ct }}" }
+                - service: light.turn_off
+                  target:
+                    entity_id: ["{{ ml1 }}", "{{ ml2 }}"]
+
+        - delay:
+            minutes: "{{ hold }}"
