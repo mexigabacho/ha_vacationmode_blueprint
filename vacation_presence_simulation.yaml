@@ -1,0 +1,260 @@
+blueprint:
+  name: "Vacation Presence Simulation"
+  description: >
+    Simulates occupancy by randomly cycling room lights through the evening,
+    transitioning to a single dim ambient lamp at bedtime, then shutting
+    everything off in the morning. All entities and times are configurable
+    through the UI. Requires vacation_evening_loop and vacation_ambient_stretch
+    scripts installed in scripts.yaml.
+  domain: automation
+  input:
+    vacation_mode:
+      name: Vacation Mode Toggle
+      description: "Toggle to enable or disable the simulation (input_boolean)"
+      selector:
+        entity:
+          domain: input_boolean
+
+    room_light_1:
+      name: Room Light 1
+      selector:
+        entity:
+          domain: light
+    room_light_2:
+      name: Room Light 2
+      selector:
+        entity:
+          domain: light
+    room_light_3:
+      name: Room Light 3
+      selector:
+        entity:
+          domain: light
+    room_light_4:
+      name: Room Light 4
+      selector:
+        entity:
+          domain: light
+
+    ambient_light_1:
+      name: Ambient Light 1
+      description: "Lamp or accent light used for nighttime simulation"
+      selector:
+        entity:
+          domain: light
+    ambient_light_2:
+      name: Ambient Light 2
+      selector:
+        entity:
+          domain: light
+    ambient_light_3:
+      name: Ambient Light 3
+      selector:
+        entity:
+          domain: light
+
+    evening_brightness_min:
+      name: Evening Brightness — Min (%)
+      default: 35
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider
+    evening_brightness_max:
+      name: Evening Brightness — Max (%)
+      default: 80
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider
+
+    color_temp_min:
+      name: Color Temperature — Min (Kelvin)
+      description: "2200=candlelight  2700=warm  3000=soft  4000=neutral"
+      default: 2700
+      selector:
+        number:
+          min: 2200
+          max: 6500
+          step: 100
+          unit_of_measurement: "K"
+          mode: slider
+    color_temp_max:
+      name: Color Temperature — Max (Kelvin)
+      default: 4000
+      selector:
+        number:
+          min: 2200
+          max: 6500
+          step: 100
+          unit_of_measurement: "K"
+          mode: slider
+
+    ambient_brightness:
+      name: Ambient Light Brightness (%)
+      description: "Keep low for a realistic bedside lamp effect"
+      default: 18
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider
+    ambient_color_temp:
+      name: Ambient Color Temperature (Kelvin)
+      description: "Very warm (2200) recommended for nighttime"
+      default: 2200
+      selector:
+        number:
+          min: 2200
+          max: 6500
+          step: 100
+          unit_of_measurement: "K"
+          mode: slider
+
+    evening_start_time:
+      name: Evening Start Time
+      default: "19:30:00"
+      selector:
+        time:
+    bedtime_time:
+      name: Bedtime Transition Time
+      default: "23:30:00"
+      selector:
+        time:
+    morning_off_time:
+      name: Morning Shutoff Time
+      default: "06:30:00"
+      selector:
+        time:
+
+# Parallel so all three time triggers can fire independent instances.
+# Evening fires, starts the script, and finishes immediately.
+# Bedtime fires, runs the ~15-min stagger, then starts ambient non-blocking.
+# Morning fires, stops all scripts and clears lights.
+mode: parallel
+max: 3
+
+trigger:
+  - platform: time
+    at: !input evening_start_time
+    id: "evening_start"
+  - platform: time
+    at: !input bedtime_time
+    id: "bedtime"
+  - platform: time
+    at: !input morning_off_time
+    id: "morning_off"
+
+condition:
+  - condition: state
+    entity_id: !input vacation_mode
+    state: "on"
+
+action:
+  - choose:
+
+      # ── EVENING START ───────────────────────────────────────────
+      - conditions: "{{ trigger.id == 'evening_start' }}"
+        sequence:
+          # Stop any scripts left over from a previous run
+          - service: script.turn_off
+            target:
+              entity_id:
+                - script.vacation_evening_loop
+                - script.vacation_ambient_stretch
+          - service: light.turn_off
+            target:
+              entity_id:
+                - !input room_light_1
+                - !input room_light_2
+                - !input room_light_3
+                - !input room_light_4
+                - !input ambient_light_1
+                - !input ambient_light_2
+                - !input ambient_light_3
+          - delay:
+              seconds: 2
+          # Start evening loop — non-blocking, runs until stopped by bedtime trigger
+          - service: script.turn_on
+            target:
+              entity_id: script.vacation_evening_loop
+            data:
+              variables:
+                ml1: !input room_light_1
+                ml2: !input room_light_2
+                ml3: !input room_light_3
+                ml4: !input room_light_4
+                bri_min: !input evening_brightness_min
+                bri_max: !input evening_brightness_max
+                ct_min: !input color_temp_min
+                ct_max: !input color_temp_max
+                vacation_mode_entity: !input vacation_mode
+
+      # ── BEDTIME TRANSITION ──────────────────────────────────────
+      - conditions: "{{ trigger.id == 'bedtime' }}"
+        sequence:
+          - service: script.turn_off
+            target:
+              entity_id: script.vacation_evening_loop
+          # Stagger main lights off over ~15 minutes in parallel
+          - parallel:
+              - sequence:
+                  - delay:
+                      minutes: "{{ range(0, 5) | random }}"
+                  - service: light.turn_off
+                    target:
+                      entity_id: !input room_light_1
+              - sequence:
+                  - delay:
+                      minutes: "{{ range(3, 9) | random }}"
+                  - service: light.turn_off
+                    target:
+                      entity_id: !input room_light_2
+              - sequence:
+                  - delay:
+                      minutes: "{{ range(6, 13) | random }}"
+                  - service: light.turn_off
+                    target:
+                      entity_id: !input room_light_3
+              - sequence:
+                  - delay:
+                      minutes: "{{ range(9, 16) | random }}"
+                  - service: light.turn_off
+                    target:
+                      entity_id: !input room_light_4
+          # Start ambient stretch — non-blocking, self-terminates after 1–2 hours
+          - service: script.turn_on
+            target:
+              entity_id: script.vacation_ambient_stretch
+            data:
+              variables:
+                al1: !input ambient_light_1
+                al2: !input ambient_light_2
+                al3: !input ambient_light_3
+                ambient_bri: !input ambient_brightness
+                ambient_ct: !input ambient_color_temp
+                vacation_mode_entity: !input vacation_mode
+
+      # ── MORNING SHUTOFF ─────────────────────────────────────────
+      - conditions: "{{ trigger.id == 'morning_off' }}"
+        sequence:
+          - service: script.turn_off
+            target:
+              entity_id:
+                - script.vacation_evening_loop
+                - script.vacation_ambient_stretch
+          - service: light.turn_off
+            target:
+              entity_id:
+                - !input room_light_1
+                - !input room_light_2
+                - !input room_light_3
+                - !input room_light_4
+                - !input ambient_light_1
+                - !input ambient_light_2
+                - !input ambient_light_3
