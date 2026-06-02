@@ -4,10 +4,23 @@ blueprint:
     Simulates occupancy by randomly cycling room lights through the evening,
     transitioning to a single dim ambient lamp at bedtime, then shutting
     everything off in the morning. All entities and times are configurable
-    through the UI. Requires vacation_evening_loop and vacation_ambient_stretch
-    scripts installed in scripts.yaml.
+    through the UI. Requires the two vacation presence scripts to be installed
+    (selectable below).
   domain: automation
   input:
+    evening_loop_script:
+      name: Evening Loop Script
+      description: "Select the vacation_evening_loop script"
+      selector:
+        entity:
+          domain: script
+    ambient_stretch_script:
+      name: Ambient Stretch Script
+      description: "Select the vacation_ambient_stretch script"
+      selector:
+        entity:
+          domain: script
+
     vacation_mode:
       name: Vacation Mode Toggle
       description: "Toggle to enable or disable the simulation (input_boolean)"
@@ -162,12 +175,12 @@ action:
       - conditions: "{{ trigger.id == 'evening_start' }}"
         sequence:
           # Stop any scripts left over from a previous run
-          - service: script.turn_off
+          - action: script.turn_off
             target:
               entity_id:
-                - script.vacation_evening_loop
-                - script.vacation_ambient_stretch
-          - service: light.turn_off
+                - !input evening_loop_script
+                - !input ambient_stretch_script
+          - action: light.turn_off
             target:
               entity_id:
                 - !input room_light_1
@@ -180,9 +193,9 @@ action:
           - delay:
               seconds: 2
           # Start evening loop — non-blocking, runs until stopped by bedtime trigger
-          - service: script.turn_on
+          - action: script.turn_on
             target:
-              entity_id: script.vacation_evening_loop
+              entity_id: !input evening_loop_script
             data:
               variables:
                 ml1: !input room_light_1
@@ -198,39 +211,39 @@ action:
       # ── BEDTIME TRANSITION ──────────────────────────────────────
       - conditions: "{{ trigger.id == 'bedtime' }}"
         sequence:
-          - service: script.turn_off
+          - action: script.turn_off
             target:
-              entity_id: script.vacation_evening_loop
+              entity_id: !input evening_loop_script
           # Stagger main lights off over ~15 minutes in parallel
           - parallel:
               - sequence:
                   - delay:
                       minutes: "{{ range(0, 5) | random }}"
-                  - service: light.turn_off
+                  - action: light.turn_off
                     target:
                       entity_id: !input room_light_1
               - sequence:
                   - delay:
                       minutes: "{{ range(3, 9) | random }}"
-                  - service: light.turn_off
+                  - action: light.turn_off
                     target:
                       entity_id: !input room_light_2
               - sequence:
                   - delay:
                       minutes: "{{ range(6, 13) | random }}"
-                  - service: light.turn_off
+                  - action: light.turn_off
                     target:
                       entity_id: !input room_light_3
               - sequence:
                   - delay:
                       minutes: "{{ range(9, 16) | random }}"
-                  - service: light.turn_off
+                  - action: light.turn_off
                     target:
                       entity_id: !input room_light_4
           # Start ambient stretch — non-blocking, self-terminates after 1–2 hours
-          - service: script.turn_on
+          - action: script.turn_on
             target:
-              entity_id: script.vacation_ambient_stretch
+              entity_id: !input ambient_stretch_script
             data:
               variables:
                 al1: !input ambient_light_1
@@ -243,12 +256,12 @@ action:
       # ── MORNING SHUTOFF ─────────────────────────────────────────
       - conditions: "{{ trigger.id == 'morning_off' }}"
         sequence:
-          - service: script.turn_off
+          - action: script.turn_off
             target:
               entity_id:
-                - script.vacation_evening_loop
-                - script.vacation_ambient_stretch
-          - service: light.turn_off
+                - !input evening_loop_script
+                - !input ambient_stretch_script
+          - action: light.turn_off
             target:
               entity_id:
                 - !input room_light_1
